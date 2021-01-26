@@ -113,8 +113,6 @@ class ViewController: UIViewController {
     
     @IBAction func placeUniverse(_ sender: UILongPressGestureRecognizer) {
 
-        print(keepAliveVals)
-        print(bringAliveVals)
         //Gesture begin case
         if universe.geometry == nil && sender.state == .began{
             
@@ -177,38 +175,69 @@ class ViewController: UIViewController {
         
         let gdq = DispatchQueue(label: "com.conwAR.queue", qos: .userInteractive)
         gdq.async{
+            //Populate initial list of living cells
+            var allAlive: Set<SIMD3<Int>> = []
+            for i in 0...(totalN-1) {
+                for j in 0...(totalN-1) {
+                    for k in 0...(totalN-1) {
+                        let alive = self.getVoxel(i:i, j:j, k:k)!.geometry?.firstMaterial?.diffuse.contents as! UIColor != UIColor.clear
+                        if alive{
+                            allAlive.insert(SIMD3<Int>([i, j, k]))
+                        }
+                    }
+                }
+            }
+            
+            //Continuously update living cells
             while true {
-                
                 //Compute updates
+                var toCheck: Set<SIMD3<Int>> = allAlive
                 var toBringAlive: [SIMD3<Int>] = []
                 var toKill: [SIMD3<Int>] = []
-                for i in 0...(totalN-1) {
-                    for j in 0...(totalN-1) {
-                        for k in 0...(totalN-1) {
-                            let alive = self.getVoxel(i:i, j:j, k:k)!.geometry?.firstMaterial?.diffuse.contents as! UIColor != UIColor.clear
-                            let livingNeighbors = self.countLivingNeighbors(i: i,
-                                                                            j: j,
-                                                                            k: k,
-                                                                            totalN: totalN)
-                            if alive && !keepAliveVals.contains(livingNeighbors) {
-                                toKill.append(SIMD3<Int>([i, j, k]))
-                            }
-                            if !alive && bringAliveVals.contains(livingNeighbors) {
-                                toBringAlive.append(SIMD3<Int>([i, j, k]))
+                for cellCoords in allAlive {
+                    let i = cellCoords.x
+                    let j = cellCoords.y
+                    let k = cellCoords.z
+                    for di in -1...1 {
+                        for dj in -1...1 {
+                            for dk in -1...1{
+                                if abs(di) + abs(dj) + abs(dk) != 0{
+                                    toCheck.insert(SIMD3<Int>([(i+di)%%totalN,
+                                                               (j+dj)%%totalN,
+                                                               (k+dk)%%totalN]))
+                                }
                             }
                         }
+                    }
+                }
+                
+                for cellCoords in toCheck{
+                    let i = cellCoords.x
+                    let j = cellCoords.y
+                    let k = cellCoords.z
+                    let alive = self.getVoxel(i:i, j:j, k:k)!.geometry?.firstMaterial?.diffuse.contents as! UIColor != UIColor.clear
+                    let livingNeighbors = self.countLivingNeighbors(i: i,
+                                                                    j: j,
+                                                                    k: k,
+                                                                    totalN: totalN)
+                    if alive && !keepAliveVals.contains(livingNeighbors) {
+                        toKill.append(SIMD3<Int>([i, j, k]))
+                    }
+                    if !alive && bringAliveVals.contains(livingNeighbors) {
+                        toBringAlive.append(SIMD3<Int>([i, j, k]))
                     }
                 }
                 
                 //Execute updates
                 for voxelCoords in toBringAlive {
                     self.setVoxel(i: voxelCoords.x, j: voxelCoords.y, k: voxelCoords.z)
+                    allAlive.insert(SIMD3<Int>([voxelCoords.x, voxelCoords.y, voxelCoords.z]))
                 }
                 for voxelCoords in toKill {
                     self.unsetVoxel(i: voxelCoords.x, j: voxelCoords.y, k: voxelCoords.z)
+                    allAlive.remove(SIMD3<Int>([voxelCoords.x, voxelCoords.y, voxelCoords.z]))
                 }
-                
-                //Wait before progressing to next frame
+                //TODO Wait before progressing to next frame
             }
         }
     }
