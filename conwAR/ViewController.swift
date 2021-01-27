@@ -11,7 +11,8 @@ import AudioToolbox
 
 var keepAliveVals: [Int] = [2, 3]
 var bringAliveVals: [Int] = [5]
-
+var meanDensity: Float = 0.1
+var shouldRandomInit: Bool = false
 
 //Because aparently swift doesnt have mod built in
 infix operator %%
@@ -22,6 +23,11 @@ extension Int {
         if left >= -right { return (left+right) }
         return ((left % right)+right)%right
     }
+}
+
+func randomFloat() -> Float{
+    //https://stackoverflow.com/questions/25050309/swift-random-float-between-0-and-1
+    return Float(arc4random()) / 0xFFFFFFFF
 }
 
 class ViewController: UIViewController {
@@ -111,6 +117,27 @@ class ViewController: UIViewController {
         focusedVoxel!.opacity = 0.5
     }
     
+    func checkShouldInit() {
+        if shouldRandomInit {
+            var totalN = 1
+            for _ in 0...(maxDepth-1) {
+                totalN = 2*totalN
+            }
+            
+            for i in 0...(totalN-1) {
+                for j in 0...(totalN-1) {
+                    for k in 0...(totalN-1) {
+                        if randomFloat() < meanDensity {
+                            setVoxel(i: i, j: j, k: k)
+                        }
+                    }
+                }
+            }
+            
+            shouldRandomInit = false
+        }
+    }
+    
     @IBAction func placeUniverse(_ sender: UILongPressGestureRecognizer) {
 
         //Gesture begin case
@@ -156,6 +183,7 @@ class ViewController: UIViewController {
                 while !self.universeStarted{
                     usleep(10*1000)
                     self.updateFocusedVoxel()
+                    self.checkShouldInit()
                 }
             }
         } else if sender.state == .began {
@@ -439,4 +467,7 @@ class settingsViewController: UIViewController, UITextFieldDelegate {
         return false
     }
     
+    @IBAction func randomInit(_ sender: UIButton) {
+        shouldRandomInit = true
+    }
 }
