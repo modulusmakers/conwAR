@@ -182,7 +182,7 @@ class ViewController: UIViewController {
                          maxDepth: maxDepth,
                          originOffset: [0, 0, 0])
             
-            //initGlider_23_5(i:4, j:4, k:4)
+            initGlider_23_5(i:4, j:4, k:4)
             //run()
 
             
@@ -225,7 +225,7 @@ class ViewController: UIViewController {
                     }
                 }
             }
-            
+            print("All alive: ", allAlive.count);
             //Continuously update living cells
             while true {
                 //Compute updates
@@ -255,10 +255,12 @@ class ViewController: UIViewController {
                     let k = cellCoords.z
                     //let alive = self.getVoxel(i:i, j:j, k:k)!.geometry?.firstMaterial?.diffuse.contents as! UIColor != UIColor.clear
                     let alive = (self.getVoxel(i:i, j:j, k:k)!.geometry?.firstMaterial?.diffuse.contents as! UIColor).accessibilityName != "transparent"
+             
                     let livingNeighbors = self.countLivingNeighbors(i: i,
                                                                     j: j,
                                                                     k: k,
                                                                     totalN: totalN)
+                    
                     if alive && !keepAliveVals.contains(livingNeighbors) {
                         toKill.append(SIMD3<Int>([i, j, k]))
                     }
@@ -266,7 +268,9 @@ class ViewController: UIViewController {
                         toBringAlive.append(SIMD3<Int>([i, j, k]))
                     }
                 }
-                
+                print("toKill: ", toKill.count)
+                print("toBringAlive: ", toBringAlive.count)
+
                 //Execute updates
                 for voxelCoords in toBringAlive {
                     self.setVoxel(i: voxelCoords.x, j: voxelCoords.y, k: voxelCoords.z)
@@ -291,8 +295,7 @@ class ViewController: UIViewController {
                         let voxel = self.getVoxel(i: (i+di)%%totalN,
                                                   j: (j+dj)%%totalN,
                                                   k: (k+dk)%%totalN)
-                        //let alive = voxel!.geometry?.firstMaterial?.diffuse.contents as! UIColor != UIColor.clear
-                        let alive = (self.getVoxel(i:i, j:j, k:k)!.geometry?.firstMaterial?.diffuse.contents as! UIColor).accessibilityName != "transparent"
+                        let alive = (voxel!.geometry?.firstMaterial?.diffuse.contents as! UIColor).accessibilityName != "transparent"
                         if alive {
                             aliveCount = aliveCount + 1
                         }
