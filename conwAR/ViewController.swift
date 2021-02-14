@@ -225,12 +225,11 @@ class ViewController: UIViewController {
                     }
                 }
             }
-            print("All alive: ", allAlive.count);
             //Continuously update living cells
             while true {
                 //Compute updates
                 var toCheck: Set<SIMD3<Int>> = allAlive
-                var toBringAlive: [SIMD3<Int>] = []
+                var toBringAlive: [(SIMD3<Int>, UIColor)] = []
                 var toKill: [SIMD3<Int>] = []
                 for cellCoords in allAlive {
                     let i = cellCoords.x
@@ -256,23 +255,24 @@ class ViewController: UIViewController {
                     //let alive = self.getVoxel(i:i, j:j, k:k)!.geometry?.firstMaterial?.diffuse.contents as! UIColor != UIColor.clear
                     let alive = (self.getVoxel(i:i, j:j, k:k)!.geometry?.firstMaterial?.diffuse.contents as! UIColor).accessibilityName != "transparent"
              
-                    let livingNeighbors = self.countLivingNeighbors(i: i,
-                                                                    j: j,
-                                                                    k: k,
-                                                                    totalN: totalN)
-                    
+                    let livingNeighborsTuple = self.countLivingNeighbors(i: i,
+                                                                         j: j,
+                                                                         k: k,
+                                                                         totalN: totalN)
+                    let livingNeighbors = livingNeighborsTuple.0
                     if alive && !keepAliveVals.contains(livingNeighbors) {
                         toKill.append(SIMD3<Int>([i, j, k]))
                     }
                     if !alive && bringAliveVals.contains(livingNeighbors) {
-                        toBringAlive.append(SIMD3<Int>([i, j, k]))
+                        toBringAlive.append((SIMD3<Int>([i, j, k]), livingNeighborsTuple.1!))
                     }
                 }
-                print("toKill: ", toKill.count)
-                print("toBringAlive: ", toBringAlive.count)
+
 
                 //Execute updates
-                for voxelCoords in toBringAlive {
+                for voxelCoordTuple in toBringAlive {
+                    let voxelCoords = voxelCoordTuple.0
+                    color = voxelCoordTuple.1
                     self.setVoxel(i: voxelCoords.x, j: voxelCoords.y, k: voxelCoords.z)
                     allAlive.insert(SIMD3<Int>([voxelCoords.x, voxelCoords.y, voxelCoords.z]))
                 }
@@ -285,7 +285,9 @@ class ViewController: UIViewController {
         }
     }
     
-    func countLivingNeighbors(i: Int, j: Int, k: Int, totalN: Int) -> Int {
+    func countLivingNeighbors(i: Int, j: Int, k: Int, totalN: Int) -> (Int, UIColor?) {
+        var colorCounts: [String:Int] = [:]
+
         var aliveCount: Int = 0
         for di in -1...1 {
             for dj in -1...1 {
@@ -295,15 +297,45 @@ class ViewController: UIViewController {
                         let voxel = self.getVoxel(i: (i+di)%%totalN,
                                                   j: (j+dj)%%totalN,
                                                   k: (k+dk)%%totalN)
-                        let alive = (voxel!.geometry?.firstMaterial?.diffuse.contents as! UIColor).accessibilityName != "transparent"
+                        let cname = (voxel!.geometry?.firstMaterial?.diffuse.contents as! UIColor).accessibilityName
+
+
+                        let alive = cname != "transparent"
+                        
                         if alive {
                             aliveCount = aliveCount + 1
+                            if colorCounts[cname] != nil {
+                                colorCounts[cname] = colorCounts[cname]! + 1
+                            } else {
+                                colorCounts[cname] = 1
+                            }
                         }
+                        
                     }
                 }
             }
         }
-        return aliveCount
+        var rColor:UIColor? = nil
+        if aliveCount > 0 {
+            let maxColor = colorCounts.max(by: { a, b in a.value < b.value })
+            if maxColor!.key == "dark red" {
+                rColor = UIColor.red
+            }
+            
+            if maxColor!.key == "orange" {
+                rColor = UIColor.orange
+            }
+            
+            if maxColor!.key == "vibrant green" {
+                rColor = UIColor.green
+            }
+            
+            if maxColor!.key == "dark blue" {
+                rColor = UIColor.blue
+            }
+
+        }
+        return (aliveCount, rColor)
     }
     
     func getVoxel(i: Int, j: Int, k: Int) -> SCNNode? {
@@ -339,7 +371,6 @@ class ViewController: UIViewController {
     }
     
     func setVoxel(i: Int, j: Int, k: Int) {
-        print("Setting voxel with: ", color.accessibilityName)
         var voxel = self.getVoxel(i:i, j:j, k:k)
         voxel!.geometry?.firstMaterial?.diffuse.contents = color
         voxel!.opacity = 0.8
@@ -477,6 +508,7 @@ class settingsViewController: UIViewController, UITextFieldDelegate {
         if title == "Orange" {
             color = UIColor.orange
         }
+
     }
     
     override func viewDidLoad() {
