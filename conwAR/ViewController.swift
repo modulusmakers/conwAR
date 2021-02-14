@@ -13,6 +13,7 @@ var keepAliveVals: [Int] = [2, 3]
 var bringAliveVals: [Int] = [5]
 var meanDensity: Float = 0.1
 var shouldRandomInit: Bool = false
+var color: UIColor = UIColor.orange
 
 //Because aparently swift doesnt have mod built in
 infix operator %%
@@ -43,6 +44,7 @@ class ViewController: UIViewController {
     var universeStarted: Bool = false
     var focusPointZDist: Float = 0.3
     var focusedVoxelWasAlive: Bool = false
+    var focusedVoxelHadColor: UIColor? = nil
 
     
     override func viewDidLoad() {
@@ -56,7 +58,13 @@ class ViewController: UIViewController {
             return
         }
         AudioServicesPlayAlertSound(1519)
+        if !focusedVoxelWasAlive {
+            focusedVoxelHadColor = color
+        } else {
+            focusedVoxelHadColor = UIColor.clear
+        }
         focusedVoxelWasAlive = !focusedVoxelWasAlive
+        
     }
     
     @IBAction func resizeUniverse(_ sender: UIPinchGestureRecognizer) {
@@ -101,20 +109,23 @@ class ViewController: UIViewController {
         //Update focused voxel if necessary
         if focusedVoxel == nil {
             focusedVoxel = parent
-            focusedVoxelWasAlive = focusedVoxel!.geometry?.firstMaterial?.diffuse.contents as! UIColor == UIColor.orange
+            focusedVoxelWasAlive = (focusedVoxel!.geometry?.firstMaterial?.diffuse.contents as! UIColor).accessibilityName != "transparent"
+            focusedVoxelHadColor = focusedVoxel!.geometry?.firstMaterial?.diffuse.contents as! UIColor
         } else if focusedVoxel != parent {
             if focusedVoxelWasAlive {
-                focusedVoxel!.geometry?.firstMaterial?.diffuse.contents = UIColor.orange
+                focusedVoxel!.geometry?.firstMaterial?.diffuse.contents = focusedVoxelHadColor!
                 focusedVoxel!.opacity = 0.8
             } else {
                 focusedVoxel!.geometry?.firstMaterial?.diffuse.contents = UIColor.clear
                 focusedVoxel!.opacity = 0.0
             }
             focusedVoxel = parent
-            focusedVoxelWasAlive = focusedVoxel!.geometry?.firstMaterial?.diffuse.contents as! UIColor == UIColor.orange
+            focusedVoxelWasAlive = (focusedVoxel!.geometry?.firstMaterial?.diffuse.contents as! UIColor).accessibilityName != "transparent"
+            focusedVoxelHadColor = focusedVoxel!.geometry?.firstMaterial?.diffuse.contents as! UIColor
+
         } else {}
-        focusedVoxel!.geometry?.firstMaterial?.diffuse.contents = UIColor.blue
-        focusedVoxel!.opacity = 0.5
+        focusedVoxel!.geometry?.firstMaterial?.diffuse.contents = UIColor.purple
+        focusedVoxel!.opacity = 0.7
     }
     
     func checkShouldInit() {
@@ -170,7 +181,6 @@ class ViewController: UIViewController {
                          curDepth: 0,
                          maxDepth: maxDepth,
                          originOffset: [0, 0, 0])
-            print("Successfully placed universe!")
             
             initGlider_23_5(i:4, j:4, k:4)
             //run()
@@ -208,19 +218,18 @@ class ViewController: UIViewController {
             for i in 0...(totalN-1) {
                 for j in 0...(totalN-1) {
                     for k in 0...(totalN-1) {
-                        let alive = self.getVoxel(i:i, j:j, k:k)!.geometry?.firstMaterial?.diffuse.contents as! UIColor != UIColor.clear
+                        let alive = (self.getVoxel(i:i, j:j, k:k)!.geometry?.firstMaterial?.diffuse.contents as! UIColor).accessibilityName != "transparent"
                         if alive{
                             allAlive.insert(SIMD3<Int>([i, j, k]))
                         }
                     }
                 }
             }
-            
             //Continuously update living cells
             while true {
                 //Compute updates
                 var toCheck: Set<SIMD3<Int>> = allAlive
-                var toBringAlive: [SIMD3<Int>] = []
+                var toBringAlive: [(SIMD3<Int>, UIColor)] = []
                 var toKill: [SIMD3<Int>] = []
                 for cellCoords in allAlive {
                     let i = cellCoords.x
@@ -243,21 +252,27 @@ class ViewController: UIViewController {
                     let i = cellCoords.x
                     let j = cellCoords.y
                     let k = cellCoords.z
-                    let alive = self.getVoxel(i:i, j:j, k:k)!.geometry?.firstMaterial?.diffuse.contents as! UIColor != UIColor.clear
-                    let livingNeighbors = self.countLivingNeighbors(i: i,
-                                                                    j: j,
-                                                                    k: k,
-                                                                    totalN: totalN)
+                    //let alive = self.getVoxel(i:i, j:j, k:k)!.geometry?.firstMaterial?.diffuse.contents as! UIColor != UIColor.clear
+                    let alive = (self.getVoxel(i:i, j:j, k:k)!.geometry?.firstMaterial?.diffuse.contents as! UIColor).accessibilityName != "transparent"
+             
+                    let livingNeighborsTuple = self.countLivingNeighbors(i: i,
+                                                                         j: j,
+                                                                         k: k,
+                                                                         totalN: totalN)
+                    let livingNeighbors = livingNeighborsTuple.0
                     if alive && !keepAliveVals.contains(livingNeighbors) {
                         toKill.append(SIMD3<Int>([i, j, k]))
                     }
                     if !alive && bringAliveVals.contains(livingNeighbors) {
-                        toBringAlive.append(SIMD3<Int>([i, j, k]))
+                        toBringAlive.append((SIMD3<Int>([i, j, k]), livingNeighborsTuple.1!))
                     }
                 }
-                
+
+
                 //Execute updates
-                for voxelCoords in toBringAlive {
+                for voxelCoordTuple in toBringAlive {
+                    let voxelCoords = voxelCoordTuple.0
+                    color = voxelCoordTuple.1
                     self.setVoxel(i: voxelCoords.x, j: voxelCoords.y, k: voxelCoords.z)
                     allAlive.insert(SIMD3<Int>([voxelCoords.x, voxelCoords.y, voxelCoords.z]))
                 }
@@ -270,7 +285,9 @@ class ViewController: UIViewController {
         }
     }
     
-    func countLivingNeighbors(i: Int, j: Int, k: Int, totalN: Int) -> Int {
+    func countLivingNeighbors(i: Int, j: Int, k: Int, totalN: Int) -> (Int, UIColor?) {
+        var colorCounts: [String:Int] = [:]
+
         var aliveCount: Int = 0
         for di in -1...1 {
             for dj in -1...1 {
@@ -280,15 +297,45 @@ class ViewController: UIViewController {
                         let voxel = self.getVoxel(i: (i+di)%%totalN,
                                                   j: (j+dj)%%totalN,
                                                   k: (k+dk)%%totalN)
-                        let alive = voxel!.geometry?.firstMaterial?.diffuse.contents as! UIColor != UIColor.clear
+                        let cname = (voxel!.geometry?.firstMaterial?.diffuse.contents as! UIColor).accessibilityName
+
+
+                        let alive = cname != "transparent"
+                        
                         if alive {
                             aliveCount = aliveCount + 1
+                            if colorCounts[cname] != nil {
+                                colorCounts[cname] = colorCounts[cname]! + 1
+                            } else {
+                                colorCounts[cname] = 1
+                            }
                         }
+                        
                     }
                 }
             }
         }
-        return aliveCount
+        var rColor:UIColor? = nil
+        if aliveCount > 0 {
+            let maxColor = colorCounts.max(by: { a, b in a.value < b.value })
+            if maxColor!.key == "dark red" {
+                rColor = UIColor.red
+            }
+            
+            if maxColor!.key == "orange" {
+                rColor = UIColor.orange
+            }
+            
+            if maxColor!.key == "vibrant green" {
+                rColor = UIColor.green
+            }
+            
+            if maxColor!.key == "dark blue" {
+                rColor = UIColor.blue
+            }
+
+        }
+        return (aliveCount, rColor)
     }
     
     func getVoxel(i: Int, j: Int, k: Int) -> SCNNode? {
@@ -311,7 +358,7 @@ class ViewController: UIViewController {
                     for j in 0...(totalN-1) {
                         for k in 0...(totalN-1) {
                             var voxel = self.getVoxel(i:i, j:j, k:k)
-                            voxel!.geometry?.firstMaterial?.diffuse.contents = UIColor.orange
+                            voxel!.geometry?.firstMaterial?.diffuse.contents = UIColor.orange //TODO outdated
                             voxel!.opacity = 0.8
                             usleep(100 * 1000)
                             voxel!.geometry?.firstMaterial?.diffuse.contents = UIColor.clear
@@ -325,7 +372,7 @@ class ViewController: UIViewController {
     
     func setVoxel(i: Int, j: Int, k: Int) {
         var voxel = self.getVoxel(i:i, j:j, k:k)
-        voxel!.geometry?.firstMaterial?.diffuse.contents = UIColor.orange
+        voxel!.geometry?.firstMaterial?.diffuse.contents = color
         voxel!.opacity = 0.8
         
     }
@@ -443,6 +490,27 @@ class settingsViewController: UIViewController, UITextFieldDelegate {
     
     @IBOutlet weak var bringAliveText: UITextField!
 
+    @IBAction func toggleColor(_ sender: UISegmentedControl) {
+        let title = sender.titleForSegment(at: sender.selectedSegmentIndex)!
+        
+        if title == "Green" {
+            color = UIColor.green
+        }
+        
+        if title == "Blue" {
+            color = UIColor.blue
+        }
+        
+        if title == "Red" {
+            color = UIColor.red
+        }
+        
+        if title == "Orange" {
+            color = UIColor.orange
+        }
+
+    }
+    
     override func viewDidLoad() {
            super.viewDidLoad()
            self.keepAliveText.delegate = self
